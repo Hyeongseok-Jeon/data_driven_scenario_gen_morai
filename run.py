@@ -42,16 +42,15 @@ def coordinate_conversion(tracks, landmark, recordingMeta, origin_GT):
     landmark1_GT = origin_GT[0]
     landmark2_GT = origin_GT[1]
     landmark3_GT = origin_GT[2]
-    landmark4_GT = origin_GT[3]
-    b = np.array([landmark1_GT, landmark2_GT, landmark3_GT, landmark4_GT])
+    b = np.array([landmark1_GT, landmark2_GT, landmark3_GT])
 
     for i in range(len(landmark)):
         cur_frame = landmark[i,1]
         landmark1 = [landmark[i, 2] * meter_per_pixel, -landmark[i, 3] * meter_per_pixel]
         landmark2 = [landmark[i, 4] * meter_per_pixel, -landmark[i, 5] * meter_per_pixel]
         landmark3 = [landmark[i, 6] * meter_per_pixel, -landmark[i, 7] * meter_per_pixel]
-        landmark4 = [landmark[i, 8] * meter_per_pixel, -landmark[i, 9] * meter_per_pixel]
-        a = np.array([landmark1,landmark2, landmark3, landmark4])
+
+        a = np.array([landmark1,landmark2, landmark3])
         conversion = np.linalg.lstsq(a,b)[0]
         new_tracks[new_tracks[:, 2] == cur_frame, 4:6] = np.matmul(new_tracks[new_tracks[:, 2] == cur_frame, 4:6],conversion)
 
@@ -96,10 +95,10 @@ print('\n')
 print('Data loading ....')
 
 landmark, recordingMeta, tracks, tracksMeta, tracksClass = data_load(selected_scenario_id)
-origin_GT = [[landmark[np.where(landmark[:,1]==recordingMeta[3])[0][0], 2] * recordingMeta[15], -landmark[np.where(landmark[:,1]==recordingMeta[3])[0][0], 3] * recordingMeta[15]],
-             [landmark[np.where(landmark[:,1]==recordingMeta[3])[0][0], 4] * recordingMeta[15], -landmark[np.where(landmark[:,1]==recordingMeta[3])[0][0], 5] * recordingMeta[15]],
-             [landmark[np.where(landmark[:,1]==recordingMeta[3])[0][0], 6] * recordingMeta[15], -landmark[np.where(landmark[:,1]==recordingMeta[3])[0][0], 7] * recordingMeta[15]],
-             [landmark[np.where(landmark[:,1]==recordingMeta[3])[0][0], 8] * recordingMeta[15], -landmark[np.where(landmark[:,1]==recordingMeta[3])[0][0], 9] * recordingMeta[15]]]
+origin_GT = [[641.484, -1080.898],
+	     [653.099, -1110.089],
+             [629.438, -1119.350]]
+
 new_tracks = coordinate_conversion(tracks, landmark, recordingMeta, origin_GT)
 
 init_time = time.time() * 10**9
