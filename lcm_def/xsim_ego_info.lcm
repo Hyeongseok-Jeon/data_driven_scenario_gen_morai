@@ -1,0 +1,20 @@
+package morai_tx;
+struct xsim_ego_info
+{
+  int64_t ntime;			// nano sec [nsec]
+	float x_pos_ego;
+  float y_pos_ego;
+  float speed_ego;
+  float heading_ego;
+
+	int32_t blinker_info;
+  
+  float steering_angle; 
+
+  float fl_wheel_vel;
+  float fr_wheel_vel;
+  float rl_wheel_vel;
+  float rr_wheel_vel;
+}
+
+//MORAI_EGO_INFO
