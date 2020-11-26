@@ -1,0 +1,30 @@
+package morai_tx;
+struct xsim_vehicle_global_info
+{
+  int64_t ntime;			// nano sec [nsec]
+	/////////////////////////////////////////////////////
+  // vehicle info(Ego + Surrounding. Ego index is '0')
+  ////////////////////////////////////////////////////
+  int32_t num_of_vehicle;//including ego
+  int8_t TV_mark[num_of_vehicle];
+  int32_t id[num_of_vehicle];
+  
+  float x_pos[num_of_vehicle];
+  float y_pos[num_of_vehicle];
+  
+  float x_vel[num_of_vehicle];
+  float y_vel[num_of_vehicle];
+  
+  float length[num_of_vehicle];
+  float width[num_of_vehicle];
+  
+  float heading[num_of_vehicle];
+  
+  int32_t lane_id[num_of_vehicle];
+  
+  float dist_to_left[num_of_vehicle];
+  float dist_to_right[num_of_vehicle];
+  
+}
+
+//MORAI_XSIM_VEHICLE_INFO
