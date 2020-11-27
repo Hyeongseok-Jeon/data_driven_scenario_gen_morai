@@ -6,8 +6,16 @@ Created on Thu Nov 26 04:18:25 2020
 @author: jhs
 """
 
+#!/usr/bin/env python2
+# -*- coding: utf-8 -*-
+"""
+Created on Thu Nov 26 04:18:25 2020
+
+@author: jhs
+"""
+
 def data_list_load():
-    file_list = os.listdir('data/landmark')
+    file_list = os.listdir('../data/landmark')
     file_list_int = np.zeros(len(file_list), dtype=int)
     for i in range(len(file_list)):
         file_list_int[i] = int(file_list[i][0:4])
@@ -17,15 +25,15 @@ def data_list_load():
 
 def data_load(data_id):
     # background = mpimg.imread('../data/background/' + str(data_id) + '.jpg')
-    landmark = np.genfromtxt('data/landmark/' + str(data_id) +'_landmarks.csv', skip_header=1, delimiter=',',dtype = int)
+    landmark = np.genfromtxt('../data/landmark/' + str(data_id) +'_landmarks.csv', skip_header=1, delimiter=',',dtype = int)
     landmark[:,1] = landmark[:,1] % 10000
-    recordingMeta = np.genfromtxt('data/recordingMeta/' + str(data_id) + '_recordingMeta.csv', skip_header=1, delimiter = ',')
+    recordingMeta = np.genfromtxt('../data/recordingMeta/' + str(data_id) + '_recordingMeta.csv', skip_header=1, delimiter = ',')
     recordingMeta[3] = recordingMeta[3] % 10000
-    tracks = np.genfromtxt('data/tracks/' + str(data_id) + '_tracks.csv', skip_header=1, delimiter = ',')
-    tracksMeta = np.genfromtxt('data/tracksMeta/' + str(data_id) + '_trackMeta.csv', skip_header=1, delimiter = ',')
+    tracks = np.genfromtxt('../data/tracks/' + str(data_id) + '_tracks.csv', skip_header=1, delimiter = ',')
+    tracksMeta = np.genfromtxt('../data/tracksMeta/' + str(data_id) + '_trackMeta.csv', skip_header=1, delimiter = ',')
     tracksMeta = np.delete(tracksMeta, -1, -1)
     tracksClass = []
-    with open('data/tracksMeta/' + str(data_id) + '_trackMeta.csv', "r") as tmp_file:
+    with open('../data/tracksMeta/' + str(data_id) + '_trackMeta.csv', "r") as tmp_file:
         csvReader = csv.reader(tmp_file)
         header = next(csvReader)
         class_index = header.index("class")
@@ -36,10 +44,10 @@ def data_load(data_id):
     return landmark, recordingMeta, tracks, tracksMeta, tracksClass
 
 def coordinate_conversion(tracks, landmark, recordingMeta, origin_GT):
-    global center_GT
-    global landmark1_GT
-    global landmark2_GT
-    global landmark3_GT
+    global center_ref
+    global landmark1_ref
+    global landmark2_ref
+    global landmark3_ref
     global landmark1_trans
     global landmark2_trans
     global landmark3_trans
@@ -48,10 +56,11 @@ def coordinate_conversion(tracks, landmark, recordingMeta, origin_GT):
     meter_per_pixel = recordingMeta[15]
     new_tracks = np.zeros_like(tracks)
     new_tracks[:] = tracks[:]
-    landmark1_GT = np.asarray([origin_GT[0]])
-    landmark2_GT = np.asarray([origin_GT[1]])
-    landmark3_GT = np.asarray([origin_GT[2]])
-    center_GT = [(landmark1_GT[0,0] + landmark2_GT[0,0] + landmark3_GT[0,0])/3, (landmark1_GT[0,1] + landmark2_GT[0,1] + landmark3_GT[0,1])/3]
+    reference_frame = recordingMeta[3]
+    landmark1_ref = np.asarray([[landmark[np.where(landmark[:,1]==reference_frame)[0][0], 2] * meter_per_pixel, -landmark[np.where(landmark[:,1]==reference_frame)[0][0], 3] * meter_per_pixel]])
+    landmark2_ref = np.asarray([[landmark[np.where(landmark[:,1]==reference_frame)[0][0], 4] * meter_per_pixel, -landmark[np.where(landmark[:,1]==reference_frame)[0][0], 5] * meter_per_pixel]])
+    landmark3_ref = np.asarray([[landmark[np.where(landmark[:,1]==reference_frame)[0][0], 6] * meter_per_pixel, -landmark[np.where(landmark[:,1]==reference_frame)[0][0], 7] * meter_per_pixel]])
+    center_ref = [(landmark1_ref[0,0] + landmark2_ref[0,0] + landmark3_ref[0,0])/3, (landmark1_ref[0,1] + landmark2_ref[0,1] + landmark3_ref[0,1])/3]
 
     for i in range(len(landmark)):
         cur_frame = landmark[i,1]
@@ -60,8 +69,8 @@ def coordinate_conversion(tracks, landmark, recordingMeta, origin_GT):
         landmark3 = np.asarray([[landmark[i, 6] * meter_per_pixel, -landmark[i, 7] * meter_per_pixel]])
         center = [(landmark1[0,0]  + landmark2[0,0]  + landmark3[0,0] )/3, (landmark1[0,1] + landmark2[0,1] + landmark3[0,1])/3]
 
-        transition_matrix = np.asarray([[1, 0, center_GT[0]-center[0]],
-                                        [0, 1, center_GT[1]-center[1]],
+        transition_matrix = np.asarray([[1, 0, center_ref[0]-center[0]],
+                                        [0, 1, center_ref[1]-center[1]],
                                         [0, 0, 0]])
 
         landmark1_trans = np.matmul(transition_matrix, np.transpose(np.concatenate((landmark1, np.asarray([[1]])), axis=-1)))
@@ -78,16 +87,33 @@ def coordinate_conversion(tracks, landmark, recordingMeta, origin_GT):
         rotation = np.asarray([[np.cos(res.x[0]), -np.sin(res.x[0])],
                                [np.sin(res.x[0]), np.cos(res.x[0])]])
 
-        tmp = np.matmul(rotation, tmp - np.transpose(np.asarray([center_GT])))+np.transpose(np.asarray([center_GT]))
+        tmp = np.matmul(rotation, tmp - np.transpose(np.asarray([center_ref])))+np.transpose(np.asarray([center_ref]))
         new_tracks[new_tracks[:, 2] == cur_frame, 4:6] = np.transpose(tmp)
-        new_tracks[new_tracks[:, 2] == cur_frame, 6] = new_tracks[new_tracks[:, 2] == cur_frame, 6] + np.rad2deg(res.x[0])
 
-    return new_tracks
+    newnew_tracks = np.zeros_like(tracks)
+    newnew_tracks[:] = new_tracks[:]
+    pts_dst = np.array(origin_GT)
+    pts_src = np.array([landmark1_ref[0], landmark2_ref[0], landmark3_ref[0]])
+    h, status = cv2.findHomography(pts_src, pts_dst)
+
+    for i in range(len(landmark)):
+        cur_frame = landmark[i,1]
+        data_tmp = np.transpose(newnew_tracks[newnew_tracks[:, 2] == cur_frame, 4:6])
+        num_rows, num_cols = data_tmp.shape
+        new_data = np.zeros((num_rows, num_cols))
+        for j in range(num_cols):
+            point = data_tmp[:,j]
+            new_point = cv2.perspectiveTransform(np.asarray([[point]]), h)[0][0]
+            new_data[:,j] = new_point
+
+        newnew_tracks[newnew_tracks[:, 2] == cur_frame, 4:6] = np.transpose(new_data)
+
+    return newnew_tracks
 
 def f(x):
-    ladnmark1_local = np.asarray(landmark1_trans[0:2, :]) - np.transpose(np.asarray([center_GT]))
-    ladnmark2_local = np.asarray(landmark2_trans[0:2, :]) - np.transpose(np.asarray([center_GT]))
-    ladnmark3_local = np.asarray(landmark3_trans[0:2, :]) - np.transpose(np.asarray([center_GT]))
+    ladnmark1_local = np.asarray(landmark1_trans[0:2, :]) - np.transpose(np.asarray([center_ref]))
+    ladnmark2_local = np.asarray(landmark2_trans[0:2, :]) - np.transpose(np.asarray([center_ref]))
+    ladnmark3_local = np.asarray(landmark3_trans[0:2, :]) - np.transpose(np.asarray([center_ref]))
 
     rotation = np.asarray([[np.cos(x[0]), -np.sin(x[0])],
                            [np.sin(x[0]), np.cos(x[0])]])
@@ -95,11 +121,11 @@ def f(x):
     landmark2_rot = np.matmul(rotation, ladnmark2_local)
     landmark3_rot = np.matmul(rotation, ladnmark3_local)
 
-    landmark1_final = landmark1_rot + np.transpose(np.asarray([center_GT]))
-    landmark2_final = landmark2_rot + np.transpose(np.asarray([center_GT]))
-    landmark3_final = landmark3_rot + np.transpose(np.asarray([center_GT]))
+    landmark1_final = landmark1_rot + np.transpose(np.asarray([center_ref]))
+    landmark2_final = landmark2_rot + np.transpose(np.asarray([center_ref]))
+    landmark3_final = landmark3_rot + np.transpose(np.asarray([center_ref]))
 
-    return np.linalg.norm(np.transpose(landmark1_GT) - landmark1_final) + np.linalg.norm(np.transpose(landmark2_GT) - landmark2_final) + np.linalg.norm(np.transpose(landmark3_GT) - landmark3_final)
+    return np.linalg.norm(np.transpose(landmark1_ref) - landmark1_final) + np.linalg.norm(np.transpose(landmark2_ref) - landmark2_final) + np.linalg.norm(np.transpose(landmark3_ref) - landmark3_final)
 
 import os
 import numpy as np
@@ -111,6 +137,7 @@ import lcm
 from lcm_def.morai_tx import xsim_vehicle_global_info
 from lcm_def.morai_tx import xsim_ego_info
 from scipy.optimize import minimize, rosen, rosen_der
+import cv2
 
 print('Starting KAIST dataset viewer and replayer')
 print('Data list loading ...\n')
@@ -192,3 +219,5 @@ while True:
             vehicle_state_lcm.publish("MORAI_XSIM_VEHICLE_INFO",vehicle_state.encode())
             ego_state_lcm.publish("MORAI_EGO_INFO",ego_state.encode())
             print('LCM message is published', 'frame : '+str(cur_frame))
+
+
