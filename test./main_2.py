@@ -48,10 +48,11 @@ def coordinate_conversion(tracks, landmark, recordingMeta, origin_GT):
     global landmark1_ref
     global landmark2_ref
     global landmark3_ref
-    global landmark1_trans
-    global landmark2_trans
-    global landmark3_trans
+    global landmark1
+    global landmark2
+    global landmark3
     global transition_matrix
+    global center
 
     meter_per_pixel = recordingMeta[15]
     new_tracks = np.zeros_like(tracks)
@@ -61,21 +62,15 @@ def coordinate_conversion(tracks, landmark, recordingMeta, origin_GT):
     landmark2_ref = np.asarray([[landmark[np.where(landmark[:,1]==reference_frame)[0][0], 4] * meter_per_pixel, -landmark[np.where(landmark[:,1]==reference_frame)[0][0], 5] * meter_per_pixel]])
     landmark3_ref = np.asarray([[landmark[np.where(landmark[:,1]==reference_frame)[0][0], 6] * meter_per_pixel, -landmark[np.where(landmark[:,1]==reference_frame)[0][0], 7] * meter_per_pixel]])
     center_ref = [(landmark1_ref[0,0] + landmark2_ref[0,0] + landmark3_ref[0,0])/3, (landmark1_ref[0,1] + landmark2_ref[0,1] + landmark3_ref[0,1])/3]
-
+    
     for i in range(len(landmark)):
         cur_frame = landmark[i,1]
         landmark1 = np.asarray([[landmark[i, 2] * meter_per_pixel, -landmark[i, 3] * meter_per_pixel]])
         landmark2 = np.asarray([[landmark[i, 4] * meter_per_pixel, -landmark[i, 5] * meter_per_pixel]])
         landmark3 = np.asarray([[landmark[i, 6] * meter_per_pixel, -landmark[i, 7] * meter_per_pixel]])
-        center = [(landmark1[0,0]  + landmark2[0,0]  + landmark3[0,0] )/3, (landmark1[0,1] + landmark2[0,1] + landmark3[0,1])/3]
 
-        transition_matrix = np.asarray([[1, 0, center_ref[0]-center[0]],
-                                        [0, 1, center_ref[1]-center[1]],
-                                        [0, 0, 0]])
 
-        landmark1_trans = np.matmul(transition_matrix, np.transpose(np.concatenate((landmark1, np.asarray([[1]])), axis=-1)))
-        landmark2_trans = np.matmul(transition_matrix, np.transpose(np.concatenate((landmark2, np.asarray([[1]])), axis=-1)))
-        landmark3_trans = np.matmul(transition_matrix, np.transpose(np.concatenate((landmark3, np.asarray([[1]])), axis=-1)))
+
 
         res = minimize(f, [0], method='Nelder-Mead', tol=1e-10)
         data_tmp = np.transpose(new_tracks[new_tracks[:, 2] == cur_frame, 4:6])
@@ -111,6 +106,13 @@ def coordinate_conversion(tracks, landmark, recordingMeta, origin_GT):
     return newnew_tracks
 
 def f(x):
+    transition_matrix = np.asarray([[1, 0, x[0]],
+                                    [0, 1, x[1]],
+                                    [0, 0, 0]])
+    landmark1_trans = np.matmul(transition_matrix, np.transpose(np.concatenate((landmark1, np.asarray([[1]])), axis=-1)))
+    landmark2_trans = np.matmul(transition_matrix, np.transpose(np.concatenate((landmark2, np.asarray([[1]])), axis=-1)))
+    landmark3_trans = np.matmul(transition_matrix, np.transpose(np.concatenate((landmark3, np.asarray([[1]])), axis=-1)))
+
     ladnmark1_local = np.asarray(landmark1_trans[0:2, :]) - np.transpose(np.asarray([center_ref]))
     ladnmark2_local = np.asarray(landmark2_trans[0:2, :]) - np.transpose(np.asarray([center_ref]))
     ladnmark3_local = np.asarray(landmark3_trans[0:2, :]) - np.transpose(np.asarray([center_ref]))

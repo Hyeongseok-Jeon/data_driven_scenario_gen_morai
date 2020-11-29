@@ -7,7 +7,7 @@ Created on Thu Nov 26 04:18:25 2020
 """
 
 def data_list_load():
-    file_list = os.listdir('data/landmark')
+    file_list = os.listdir('../mod_data/landmark')
     file_list_int = np.zeros(len(file_list), dtype=int)
     for i in range(len(file_list)):
         file_list_int[i] = int(file_list[i][0:4])
@@ -17,15 +17,15 @@ def data_list_load():
 
 def data_load(data_id):
     # background = mpimg.imread('../data/background/' + str(data_id) + '.jpg')
-    landmark = np.genfromtxt('data/landmark/' + str(data_id) +'_landmarks.csv', skip_header=1, delimiter=',',dtype = int)
+    landmark = np.genfromtxt('../mod_data/landmark/' + str(data_id) +'_landmarks.csv', skip_header=1, delimiter=',',dtype = int)
     landmark[:,1] = landmark[:,1] % 10000
-    recordingMeta = np.genfromtxt('data/recordingMeta/' + str(data_id) + '_recordingMeta.csv', skip_header=1, delimiter = ',')
+    recordingMeta = np.genfromtxt('../mod_data/recordingMeta/' + str(data_id) + '_recordingMeta.csv', skip_header=1, delimiter = ',')
     recordingMeta[3] = recordingMeta[3] % 10000
-    tracks = np.genfromtxt('data/tracks/' + str(data_id) + '_tracks.csv', skip_header=1, delimiter = ',')
-    tracksMeta = np.genfromtxt('data/tracksMeta/' + str(data_id) + '_trackMeta.csv', skip_header=1, delimiter = ',')
+    tracks = np.genfromtxt('../mod_data/tracks/' + str(data_id) + '_tracks.csv', skip_header=1, delimiter = ',')
+    tracksMeta = np.genfromtxt('../mod_data/tracksMeta/' + str(data_id) + '_trackMeta.csv', skip_header=1, delimiter = ',')
     tracksMeta = np.delete(tracksMeta, -1, -1)
     tracksClass = []
-    with open('data/tracksMeta/' + str(data_id) + '_trackMeta.csv', "r") as tmp_file:
+    with open('../mod_data/tracksMeta/' + str(data_id) + '_trackMeta.csv', "r") as tmp_file:
         csvReader = csv.reader(tmp_file)
         header = next(csvReader)
         class_index = header.index("class")
@@ -40,10 +40,9 @@ def coordinate_conversion(tracks, landmark, recordingMeta, origin_GT):
     global landmark1_GT
     global landmark2_GT
     global landmark3_GT
-    global landmark1_trans
-    global landmark2_trans
-    global landmark3_trans
-    global transition_matrix
+    global landmark1
+    global landmark2
+    global landmark3
 
     meter_per_pixel = recordingMeta[15]
     new_tracks = np.zeros_like(tracks)
@@ -51,55 +50,58 @@ def coordinate_conversion(tracks, landmark, recordingMeta, origin_GT):
     landmark1_GT = np.asarray([origin_GT[0]])
     landmark2_GT = np.asarray([origin_GT[1]])
     landmark3_GT = np.asarray([origin_GT[2]])
-    center_GT = [(landmark1_GT[0,0] + landmark2_GT[0,0] + landmark3_GT[0,0])/3, (landmark1_GT[0,1] + landmark2_GT[0,1] + landmark3_GT[0,1])/3]
+    center_GT = [(landmark1_GT[0, 0] + landmark2_GT[0, 0] + landmark3_GT[0, 0]) / 3, (landmark1_GT[0, 1] + landmark2_GT[0, 1] + landmark3_GT[0, 1]) / 3]
 
     for i in range(len(landmark)):
+        print(i)
         cur_frame = landmark[i,1]
         landmark1 = np.asarray([[landmark[i, 2] * meter_per_pixel, -landmark[i, 3] * meter_per_pixel]])
         landmark2 = np.asarray([[landmark[i, 4] * meter_per_pixel, -landmark[i, 5] * meter_per_pixel]])
         landmark3 = np.asarray([[landmark[i, 6] * meter_per_pixel, -landmark[i, 7] * meter_per_pixel]])
-        center = [(landmark1[0,0]  + landmark2[0,0]  + landmark3[0,0] )/3, (landmark1[0,1] + landmark2[0,1] + landmark3[0,1])/3]
+        center = [(landmark1[0, 0] + landmark2[0, 0] + landmark3[0, 0]) / 3, (landmark1[0, 1] + landmark2[0, 1] + landmark3[0, 1]) / 3]
 
-        transition_matrix = np.asarray([[1, 0, center_GT[0]-center[0]],
-                                        [0, 1, center_GT[1]-center[1]],
-                                        [0, 0, 0]])
+        res = minimize(f, [center_GT[0] - center[0], center_GT[1] - center[1], 0], method='Nelder-Mead', tol=1e-10)
 
-        landmark1_trans = np.matmul(transition_matrix, np.transpose(np.concatenate((landmark1, np.asarray([[1]])), axis=-1)))
-        landmark2_trans = np.matmul(transition_matrix, np.transpose(np.concatenate((landmark2, np.asarray([[1]])), axis=-1)))
-        landmark3_trans = np.matmul(transition_matrix, np.transpose(np.concatenate((landmark3, np.asarray([[1]])), axis=-1)))
+        trans_x = res.x[0]
+        trans_y = res.x[1]
+        rot = res.x[2]
 
-        res = minimize(f, [0], method='Nelder-Mead', tol=1e-10)
-        data_tmp = np.transpose(new_tracks[new_tracks[:, 2] == cur_frame, 4:6])
-        num_rows, num_cols = data_tmp.shape
+        veh_list = np.where(tracks[:,2]==cur_frame)[0]
+        for j in range(len(veh_list)):
+            cur_pos = np.asarray([tracks[veh_list[j], 4:6]])
+            theta_1 = np.rad2deg(np.arctan2(cur_pos[0][1], cur_pos[0][0]))
 
-        tmp = np.matmul(transition_matrix, np.concatenate((data_tmp, np.ones((1,num_cols))), axis=0))[0:2, :]
+            x_1 = trans_x + np.sqrt(cur_pos[0][0] ** 2 + cur_pos[0][1] ** 2) * np.cos(np.deg2rad(rot + theta_1))
+            y_1 = trans_y + np.sqrt(cur_pos[0][0] ** 2 + cur_pos[0][1] ** 2) * np.sin(np.deg2rad(rot + theta_1))
 
-
-        rotation = np.asarray([[np.cos(res.x[0]), -np.sin(res.x[0])],
-                               [np.sin(res.x[0]), np.cos(res.x[0])]])
-
-        tmp = np.matmul(rotation, tmp - np.transpose(np.asarray([center_GT])))+np.transpose(np.asarray([center_GT]))
-        new_tracks[new_tracks[:, 2] == cur_frame, 4:6] = np.transpose(tmp)
-        new_tracks[new_tracks[:, 2] == cur_frame, 6] = new_tracks[new_tracks[:, 2] == cur_frame, 6] + np.rad2deg(res.x[0])
+            new_tracks[veh_list[j], 4:6] = np.asarray([x_1, y_1])
+            new_tracks[veh_list[j], 6] = new_tracks[veh_list[j], 6] + rot + 90
 
     return new_tracks
 
 def f(x):
-    ladnmark1_local = np.asarray(landmark1_trans[0:2, :]) - np.transpose(np.asarray([center_GT]))
-    ladnmark2_local = np.asarray(landmark2_trans[0:2, :]) - np.transpose(np.asarray([center_GT]))
-    ladnmark3_local = np.asarray(landmark3_trans[0:2, :]) - np.transpose(np.asarray([center_GT]))
+    trans_x = x[0]
+    trans_y = x[1]
+    rot = x[2]
 
-    rotation = np.asarray([[np.cos(x[0]), -np.sin(x[0])],
-                           [np.sin(x[0]), np.cos(x[0])]])
-    landmark1_rot = np.matmul(rotation, ladnmark1_local)
-    landmark2_rot = np.matmul(rotation, ladnmark2_local)
-    landmark3_rot = np.matmul(rotation, ladnmark3_local)
+    theta_1 = np.rad2deg(np.arctan2(landmark1[0][1], landmark1[0][0]))
+    theta_2 = np.rad2deg(np.arctan2(landmark2[0][1], landmark2[0][0]))
+    theta_3 = np.rad2deg(np.arctan2(landmark3[0][1], landmark3[0][0]))
 
-    landmark1_final = landmark1_rot + np.transpose(np.asarray([center_GT]))
-    landmark2_final = landmark2_rot + np.transpose(np.asarray([center_GT]))
-    landmark3_final = landmark3_rot + np.transpose(np.asarray([center_GT]))
+    x_1 = trans_x + np.sqrt(landmark1[0][0]**2 + landmark1[0][1]**2) * np.cos(np.deg2rad(rot + theta_1))
+    y_1 = trans_y + np.sqrt(landmark1[0][0]**2 + landmark1[0][1]**2) * np.sin(np.deg2rad(rot + theta_1))
 
-    return np.linalg.norm(np.transpose(landmark1_GT) - landmark1_final) + np.linalg.norm(np.transpose(landmark2_GT) - landmark2_final) + np.linalg.norm(np.transpose(landmark3_GT) - landmark3_final)
+    x_2 = trans_x + np.sqrt(landmark2[0][0] ** 2 + landmark2[0][1] ** 2) * np.cos(np.deg2rad(rot + theta_2))
+    y_2 = trans_y + np.sqrt(landmark2[0][0] ** 2 + landmark2[0][1] ** 2) * np.sin(np.deg2rad(rot + theta_2))
+
+    x_3 = trans_x + np.sqrt(landmark3[0][0] ** 2 + landmark3[0][1] ** 2) * np.cos(np.deg2rad(rot + theta_3))
+    y_3 = trans_y + np.sqrt(landmark3[0][0] ** 2 + landmark3[0][1] ** 2) * np.sin(np.deg2rad(rot + theta_3))
+
+    landmark1_trans = np.asarray([[x_1, y_1]])
+    landmark2_trans = np.asarray([[x_2, y_2]])
+    landmark3_trans = np.asarray([[x_3, y_3]])
+
+    return np.linalg.norm(landmark1_GT - landmark1_trans) + np.linalg.norm(landmark2_GT - landmark2_trans) + np.linalg.norm(landmark3_GT - landmark3_trans)
 
 import os
 import numpy as np
@@ -142,7 +144,7 @@ print('Data loading ....')
 
 landmark, recordingMeta, tracks, tracksMeta, tracksClass = data_load(selected_scenario_id)
 origin_GT = [[641.484, -1080.898],
-	     [653.099, -1110.089],
+             [653.099, -1110.089],
              [629.438, -1119.350]]
 
 new_tracks = coordinate_conversion(tracks, landmark, recordingMeta, origin_GT)
