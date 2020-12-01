@@ -75,7 +75,7 @@ def coordinate_conversion(tracks, landmark, recordingMeta, origin_GT):
             y_1 = trans_y + np.sqrt(cur_pos[0][0] ** 2 + cur_pos[0][1] ** 2) * np.sin(np.deg2rad(rot + theta_1))
 
             new_tracks[veh_list[j], 4:6] = np.asarray([x_1, y_1])
-            new_tracks[veh_list[j], 6] = new_tracks[veh_list[j], 6] + rot + 90
+            new_tracks[veh_list[j], 6] = new_tracks[veh_list[j], 6] + rot - 90
 
     return new_tracks
 
